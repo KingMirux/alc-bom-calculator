@@ -32,6 +32,14 @@ seq_code = st.text_input("서열코드 (4자리)", max_chars=4)
 qty = st.number_input("수량", min_value=1, value=1)
 
 if st.button("조회"):
+    # 1. 입력된 길이만큼만 검색 패턴 생성
+    length = len(seq_code)
+    if length == 2:
+        patterns = [seq_code]
+    elif length == 3:
+        patterns = [seq_code, seq_code[:2], seq_code[-2:]]
+    else:
+        patterns = [seq_code, seq_code[:3], seq_code[-3:], seq_code[:2], seq_code[-2:]]
     # 3. 데이터 매칭 (ALC 시트)
     # 입력한 차종 및 방향으로 필터링
     subset = alc_df[(alc_df['차종'] == prod_name) & 
