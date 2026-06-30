@@ -58,7 +58,7 @@ if st.button("조회"):
         p_clean = str(p).strip()
         
         # 데이터프레임의 해당 컬럼들도 앞뒤 공백 제거 후 비교
-        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip().str.startswith(p_clean)).any(axis=1)
+        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip() == p_clean).any(axis=1)
         found = subset[mask]
         
         if not found.empty:
