@@ -50,7 +50,7 @@ if st.button("조회"):
     match = None
     
     # 여러 컬럼(고객사품번, 미러텍품번 등) 중 패턴이 포함된 행을 찾음
-    search_cols = ['고객사품번', '미러텍품번', 'ALC'] 
+    search_cols = ['ALC'] 
     
     for p in patterns:
         p_clean = str(p).strip()
