@@ -50,15 +50,13 @@ if st.button("조회"):
     match = None
     
     # 여러 컬럼(고객사품번, 미러텍품번 등) 중 패턴이 포함된 행을 찾음
-   # 2. 검색 대상 컬럼 지정
-    search_cols = ['고객사품번', '미러텍품번'] 
+    search_cols = ['고객사품번', '미러텍품번', 'ALC'] 
     
     for p in patterns:
-        # 입력값 p의 앞뒤 공백 제거
         p_clean = str(p).strip()
         
-        # 데이터프레임의 해당 컬럼들도 앞뒤 공백 제거 후 비교
-        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip() == p_clean).any(axis=1)
+        # 이제 고객사품번, 미러텍품번, ALC 세 군데를 모두 뒤집니다.
+        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip().str.contains(p_clean, na=False)).any(axis=1)
         found = subset[mask]
         
         if not found.empty:
