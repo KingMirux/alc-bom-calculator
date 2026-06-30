@@ -50,8 +50,17 @@ if st.button("조회"):
     match = None
     
     # 여러 컬럼(고객사품번, 미러텍품번 등) 중 패턴이 포함된 행을 찾음
+   # 2. 검색 대상 컬럼 지정
+    search_cols = ['고객사품번', '미러텍품번'] 
+    
     for p in patterns:
-        found = subset[subset.apply(lambda row: str(p) in str(row.values), axis=1)]
+        # 입력값 p의 앞뒤 공백 제거
+        p_clean = str(p).strip()
+        
+        # 데이터프레임의 해당 컬럼들도 앞뒤 공백 제거 후 비교
+        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip().str.contains(p_clean, na=False)).any(axis=1)
+        found = subset[mask]
+        
         if not found.empty:
             match = found.iloc[0]
             break
@@ -72,4 +81,8 @@ if st.button("조회"):
         else:
             st.warning("BOM 시트에서 해당 자재를 찾을 수 없습니다.")
     else:
-        st.error("입력한 조건과 일치하는 데이터를 찾을 수 없습니다.")
+        st.error("조건에 맞는 제품을 찾을 수 없습니다.")
+        # 조회가 안 될 때, 해당 차종/방향으로 필터링된 데이터라도 보여주기
+        st.write("---")
+        st.write("### 🔍 디버깅: 현재 필터링된 데이터 샘플")
+        st.write(subset[['고객사품번', '미러텍품번', 'ALC', '사양명']].head(5))
