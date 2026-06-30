@@ -28,7 +28,7 @@ except Exception as e:
 car_list = alc_df['차종'].unique().tolist()
 prod_name = st.selectbox("제품명(차종)", car_list)
 direction = st.selectbox("방향", ["LH", "RH"])
-seq_code = st.text_input("서열코드 (4자리)", max_chars=4)
+seq_code = st.text_input("서열코드 (4자리) (대문자로 써주세요)", max_chars=4)
 qty = st.number_input("수량", min_value=1, value=1)
 
 if st.button("조회"):
