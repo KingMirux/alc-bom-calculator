@@ -1,86 +1,83 @@
 import streamlit as st
 import pandas as pd
-import os
 
-# 현재 코드 파일이 있는 위치를 기준으로 엑셀 파일 경로를 잡습니다.
-base_path = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(base_path, 'ALC 코드 및 BOM 리스트.xlsx')
+st.set_page_config(page_title="ALC/BOM 자재 조회", page_icon="🔧", layout="wide")
 
-st.title("🚗 서열코드 검색기")
+DATA_PATH = "data.xlsx"
 
-# 1. 엑셀 파일 로드 (openpyxl 사용)
+
 @st.cache_data
 def load_data():
-    file_path = 'ALC 코드 및 BOM 리스트.xlsx'
-    # ALC 시트와 Sheet2 시트를 엑셀 파일에서 직접 읽어옵니다.
-    alc_df = pd.read_excel(file_path, sheet_name='ALC', engine='openpyxl')
-    bom_df = pd.read_excel(file_path, sheet_name='Sheet2', engine='openpyxl')
-    return alc_df, bom_df
+    alc = pd.read_excel(DATA_PATH, sheet_name="ALC")
+    bom = pd.read_excel(DATA_PATH, sheet_name="BOM")
 
-try:
-    alc_df, bom_df = load_data()
-except Exception as e:
-    st.error(f"엑셀 파일 로드 실패: {e}. 파일 이름과 시트명을 확인하세요.")
-    st.stop()
+    # 공백/결측 정리
+    alc["차종"] = alc["차종"].astype(str).str.strip()
+    alc["ALC"] = alc["ALC"].astype(str).str.strip()
+    alc = alc[alc["ALC"] != "nan"]
 
-# 2. 사용자 입력
-# 차종(ALC 시트 '차종' 컬럼) 드롭박스 구성
-car_list = alc_df['차종'].unique().tolist()
-prod_name = st.selectbox("제품명(차종)", car_list)
-direction = st.selectbox("방향", ["LH", "RH"])
-seq_code = st.text_input("서열코드 (4자리) (대문자로 써주세요)", max_chars=4)
-qty = st.number_input("수량", min_value=1, value=1)
+    bom["모품번"] = bom["모품번"].astype(str).str.strip()
+    return alc, bom
 
-if st.button("조회"):
-    # 1. 입력된 길이만큼만 검색 패턴 생성
-    length = len(seq_code)
-    if length == 2:
-        patterns = [seq_code]
-    elif length == 3:
-        patterns = [seq_code, seq_code[:2], seq_code[-2:]]
+
+alc_df, bom_df = load_data()
+
+st.title("🔧 ALC/BOM 자재 조회")
+st.caption("차종과 서열코드(ALC)를 선택하면 해당 사양에 들어가는 단품 자재품번/자재명을 조회합니다.")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    car_types = sorted(alc_df["차종"].unique())
+    selected_car = st.selectbox("차종 선택", car_types)
+
+with col2:
+    alc_codes = sorted(alc_df.loc[alc_df["차종"] == selected_car, "ALC"].unique())
+    selected_alc = st.selectbox("서열코드(ALC) 선택", alc_codes)
+
+matched = alc_df[(alc_df["차종"] == selected_car) & (alc_df["ALC"] == selected_alc)]
+
+if matched.empty:
+    st.warning("일치하는 사양이 없습니다.")
+else:
+    # LH/RH 등 동일 서열코드에 여러 사양이 걸리는 경우 선택하게 함
+    if len(matched) > 1:
+        spec_options = matched["사양명"].tolist()
+        selected_spec = st.radio("사양 선택", spec_options, horizontal=True)
+        row = matched[matched["사양명"] == selected_spec].iloc[0]
     else:
-        patterns = [seq_code, seq_code[:3], seq_code[-3:], seq_code[:2], seq_code[-2:]]
-    # 3. 데이터 매칭 (ALC 시트)
-    # 입력한 차종 및 방향으로 필터링
-    subset = alc_df[(alc_df['차종'] == prod_name) & 
-                    (alc_df['사양명'].astype(str).str.contains(direction, na=False))]
-    
-    # 서열코드 패턴 검색 (앞2/3, 뒤2/3)
-    patterns = [seq_code[:3], seq_code[-3:], seq_code[:2], seq_code[-2:]]
-    match = None
-    
-    # 여러 컬럼(고객사품번, 미러텍품번 등) 중 패턴이 포함된 행을 찾음
-    search_cols = ['ALC'] 
-    
-    for p in patterns:
-        p_clean = str(p).strip()
-        
-        # 이제 고객사품번, 미러텍품번, ALC 세 군데를 모두 뒤집니다.
-        mask = subset[search_cols].apply(lambda col: col.astype(str).str.strip().str.contains(p_clean, na=False)).any(axis=1)
-        found = subset[mask]
-        
-        if not found.empty:
-            match = found.iloc[0]
-            break
-            
-    if match is not None:
-        alc_val = match['ALC']
-        h_val = match['F/SUB_ROH1'] # H열 값
-        st.success(f"매칭 성공! [ALC: {alc_val}] [F/SUB_ROH1: {h_val}]")
-        
-        # 4. BOM 전개 (Sheet2/BOM 시트의 '모품번'과 대조)
-        bom_result = bom_df[bom_df['모품번'] == h_val]
-        
-        if not bom_result.empty:
-            # 상세 데이터 출력
-            result = bom_result[['자품목', '자품명', '소요량', '품목']].copy()
-            result['총 필요량'] = result['소요량'] * qty
-            st.dataframe(result)
-        else:
-            st.warning("BOM 시트에서 해당 자재를 찾을 수 없습니다.")
+        row = matched.iloc[0]
+
+    st.divider()
+    st.subheader(f"📋 사양 정보 — {row['사양명']}")
+
+    info_cols = st.columns(4)
+    info_cols[0].metric("고객사품번", row["고객사품번"])
+    info_cols[1].metric("미러텍품번", row["미러텍품번"])
+    info_cols[2].metric("F/SUB HALB", row["F/SUB_HALB"])
+    info_cols[3].metric("F/SUB ROH1", row["F/SUB_ROH1"])
+
+    st.subheader("🧩 하위 단품 자재 목록 (BOM)")
+
+    parent_code = str(row["F/SUB_ROH1"]).strip()
+    bom_matched = bom_df[bom_df["모품번"] == parent_code]
+
+    if bom_matched.empty:
+        st.info(f"BOM에서 모품번 '{parent_code}'에 해당하는 하위 자재를 찾지 못했습니다.")
     else:
-        st.error("조건에 맞는 제품을 찾을 수 없습니다.")
-        # 조회가 안 될 때, 해당 차종/방향으로 필터링된 데이터라도 보여주기
-        st.write("---")
-        st.write("### 🔍 디버깅: 현재 필터링된 데이터 샘플")
-        st.write(subset[['고객사품번', '미러텍품번', 'ALC', '사양명']].head(5))
+        display_cols = ["자품목", "자품명", "유형", "소요량", "품목", "비고"]
+        display_cols = [c for c in display_cols if c in bom_matched.columns]
+        st.dataframe(
+            bom_matched[display_cols].rename(
+                columns={"자품목": "자재품번", "자품명": "자재명"}
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+st.divider()
+with st.expander("전체 ALC 데이터 검색 (자유 검색)"):
+    keyword = st.text_input("검색어 입력 (품번, 품명, 사양명 등)")
+    if keyword:
+        mask = alc_df.apply(lambda r: r.astype(str).str.contains(keyword, case=False, na=False).any(), axis=1)
+        st.dataframe(alc_df[mask], use_container_width=True, hide_index=True)
