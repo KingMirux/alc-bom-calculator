@@ -32,7 +32,7 @@ with col1:
     selected_car = st.selectbox("차종 선택", car_types)
 
 with col2:
-    alc_codes = sorted(alc_df.loc[alc_df["차종"] == selected_car, "ALC"].unique())
+    alc_codes = alc_df.loc[alc_df["차종"] == selected_car, "ALC"].dropna().astype(str).drop_duplicates().sort_values().tolist()
     selected_alc = st.selectbox("서열코드(ALC) 선택", alc_codes)
 
 matched = alc_df[(alc_df["차종"] == selected_car) & (alc_df["ALC"] == selected_alc)]
